@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Snow Level Calculator — 500→Intensity (Fixed Offsets)</title>
+<meta name="description" content="Enter T850 and T500; we infer rain intensity and apply fixed melting offsets (no double-counting). Optional thunderstorm adds −80 m. WBZ/Wet-bulb optional." />
+<style>
+  :root{
+    --bg:#0b1220; --bg2:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --card:#111827;
+    --border:#1f2937; --accent:#38bdf8; --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:linear-gradient(180deg,var(--bg2),var(--bg));color:var(--text);
+       font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Helvetica Neue',sans-serif;}
+  .wrap{max-width:980px;margin:0 auto;padding:24px}
+  h1{margin:0 0 4px;font-size:28px;font-weight:700}
+  p.lead{margin:0 0 14px;color:var(--muted);font-size:14px}
+  .grid{display:grid;gap:16px}
+  @media (min-width:860px){ .grid-2{grid-template-columns:1fr 1fr} }
+  .card{background:rgba(17,24,39,.72);border:1px solid var(--border);border-radius:18px;padding:16px}
+  label.small{font-size:12px;color:#c9d3e7;display:block;margin:0 0 6px}
+  input[type=number], input[type=checkbox]{
+    width:100%; background:#0f172a; border:1px solid #263244; color:var(--text);
+    border-radius:12px; padding:10px 12px; outline:none;
+  }
+  input[type=number]:focus{border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,.25)}
+  .row{display:grid;gap:12px;grid-template-columns:1fr}
+  @media (min-width:520px){ .row{grid-template-columns:1fr 1fr} }
+  .kpis{display:grid;gap:12px;grid-template-columns:1fr;margin-top:8px}
+  @media (min-width:640px){ .kpis{grid-template-columns:1fr 1fr 1fr} }
+  .kpi{background:#0f172a;border:1px solid var(--border);border-radius:14px;padding:12px}
+  .kpi .t{font-size:12px;color:#7c889a}
+  .kpi .v{font-size:20px;font-weight:700;margin-top:4px}
+  .kpi .s{font-size:12px;color:#7c889a;margin-top:4px}
+  details{background:#0f172a;border:1px solid var(--border);border-radius:14px;padding:12px}
+  summary{cursor:pointer;font-weight:700}
+  .muted{color:#94a3b8;font-size:12px}
+  .footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--border);color:#99a6bb;font-size:12px}
+  .bench{display:grid;gap:10px;grid-template-columns:1fr}
+  @media (min-width:520px){ .bench{grid-template-columns:1fr 1fr} }
+  .bench .item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#0a1222;border:1px solid var(--border);border-radius:12px}
+  .pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--border);border-radius:999px;padding:6px 10px;background:#0f172a;font-size:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .bar{height:12px;background:#0f172a;border:1px solid #20314a;border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e)}
+  .labelRow{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:13px}
+  .note{font-size:12px;color:#dbe2ef}
+  .cb{display:flex;align-items:center;gap:8px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="grid" style="gap:8px;margin-bottom:8px">
+      <h1>Snow Level Calculator</h1>
+      <p class="lead">Enter 850 hPa & 500 hPa. We infer rain intensity and use fixed melting offsets (Light 120 · Moderate 180 · Heavy 240 m). Thunderstorm adds another −80 m.</p>
+      <div class="muted">Assumes moist lapse by default · Israel preset: 850 hPa ≈ 1500 m</div>
+    </header>
+
+    <section class="grid grid-2">
+      <div class="card">
+        <div class="row">
+          <div>
+            <label class="small">850 hPa temp (°C)</label>
+            <input id="t850" type="number" step="0.5" value="-3">
+          </div>
+          <div>
+            <label class="small">850 hPa height (m)</label>
+            <input id="h850" type="number" step="50" value="1500">
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <div>
+            <label class="small">Lapse rate Γ (°C/km) <span class="muted">(5.0–6.0 moist · 9.8 dry)</span></label>
+            <input id="gamma" type="number" step="0.1" value="5.5">
+          </div>
+          <div>
+            <label class="small">Your site elevation (m)</label>
+            <input id="site" type="number" step="10" value="850">
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <div>
+            <label class="small">500 hPa temp (°C)</label>
+            <input id="t500" type="number" step="0.5" placeholder="-28">
+          </div>
+          <div class="cb" style="margin-top:26px">
+            <input id="thunder" type="checkbox" style="width:auto;height:auto">
+            <label for="thunder" class="small" style="margin:0">Add thunderstorm bonus (−80 m)</label>
+          </div>
+        </div>
+
+        <details style="margin-top:12px">
+          <summary>Advanced: WBZ (optional)</summary>
+          <div class="row" style="margin-top:12px">
+            <div>
+              <label class="small">WBZ height (m) <span class="muted">optional</span></label>
+              <input id="wbz" type="number" step="10" placeholder="e.g., 1700">
+            </div>
+            <div>
+              <label class="small">WBZ method offset (m)</label>
+              <input id="wbzoff" type="number" step="10" value="200">
+            </div>
+          </div>
+          <div class="muted" style="margin-top:6px">If WBZ is provided: snow level = WBZ − offset (tweaked by inferred intensity).</div>
+        </details>
+
+        <details style="margin-top:12px">
+          <summary>Advanced: surface (optional, near event)</summary>
+          <div class="row" style="margin-top:12px">
+            <div>
+              <label class="small">Surface temp (°C) <span class="muted">leave blank to ignore</span></label>
+              <input id="tsfc" type="number" step="0.5" placeholder="e.g., 3">
+            </div>
+            <div>
+              <label class="small">Surface dew point (°C) <span class="muted">leave blank to ignore</span></label>
+              <input id="tdsfc" type="number" step="0.5" placeholder="e.g., 2">
+            </div>
+          </div>
+          <div class="muted" style="margin-top:6px">Wet‑bulb bonus only applies if BOTH T and Td are provided, T≤6°C, and T−Td≤5°C (cap −80 m).</div>
+        </details>
+
+        <div style="margin-top:12px">
+          <span class="muted">Quick presets:</span>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+            <button class="pill" data-preset="israel">Israel cold core</button>
+            <button class="pill" data-preset="wet">Wet Mediterranean</button>
+            <button class="pill" data-preset="dry">Dry continental</button>
+            <button class="pill" data-preset="deep">Deep cold core</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-weight:700">Result</h3>
+        <div class="kpis">
+          <div class="kpi">
+            <div class="t">0°C level (from 850)</div>
+            <div id="k_z0" class="v">—</div>
+            <div class="s">T850 + Γ + H850</div>
+          </div>
+          <div class="kpi">
+            <div class="t">Estimated snow level</div>
+            <div id="k_snow" class="v">—</div>
+            <div class="s" id="k_method">Method: 850‑based</div>
+          </div>
+          <div class="kpi">
+            <div class="t">Category</div>
+            <div id="k_cat" class="v">—</div>
+            <div class="s" id="k_site_sub">Site: 850 m</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:10px;background:#0b1426">
+          <div class="labelRow">
+            <div>Chance of snow at your site</div>
+            <div id="pctLabel"><b>0%</b></div>
+          </div>
+          <div class="bar"><i id="pctBar"></i></div>
+          <div class="chips">
+            <span class="pill">Inferred intensity: <b id="chip_intensity">—</b></span>
+            <span class="pill">Melting offset: <b id="chip_offset">—</b></span>
+            <span class="pill">Thunder bonus: <b id="chip_thunder">—</b></span>
+            <span class="pill">Wet‑bulb: <b id="chip_wb">—</b></span>
+          </div>
+          <div id="assumeNote" class="note" style="display:none;margin-top:8px">No T500 entered — assuming <b>Moderate</b> (−180 m). Enter T500 for better inference.</div>
+        </div>
+
+        <div class="row" style="margin-top:14px">
+          <div class="card" style="background:#0b1426">
+            <div style="font-weight:700">Local benchmarks (Israel)</div>
+            <div class="bench" style="margin-top:8px">
+              <div class="item"><span>Majdal Shams (1300 m)</span><b id="b_mj">—</b></div>
+              <div class="item"><span>Harashim (850 m)</span><b id="b_hr">—</b></div>
+              <div class="item"><span>Jerusalem (800 m)</span><b id="b_jl">—</b></div>
+              <div class="item"><span>Safed (900 m)</span><b id="b_sf">—</b></div>
+              <div class="item"><span>Mt. Hermon upper (2000+ m)</span><b id="b_hm">—</b></div>
+            </div>
+          </div>
+          <div class="card" style="background:#0b1426">
+            <div style="font-weight:700">Fixed offsets (no manual tuning)</div>
+            <ul style="margin:8px 0 0 16px; padding:0; color:#c6d0e0; font-size:14px">
+              <li>Light: −120 m</li>
+              <li>Moderate: −180 m</li>
+              <li>Heavy: −240 m</li>
+              <li>Thunderstorm: extra −80 m (checkbox)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      Educational estimator. Compare with soundings & radar. Banding and microphysics can still shift outcomes.
+    </div>
+  </div>
+
+<script>
+  function clampRound(v, min, max){ return Math.round(Math.max(min, Math.min(max, v))); }
+  function round1(v){ return Math.round(v * 10) / 10; }
+  function wetBulbApprox(T, Td){
+    const t = Number(T), td = Number(Td);
+    if (!isFinite(t) || !isFinite(td)) return NaN;
+    return t * Math.atan(0.151977 * Math.sqrt(td + 8.313659)) + Math.atan(t + td) - Math.atan(td - 1.676331) + 0.00391838 * Math.pow(Math.abs(td), 1.5) * Math.sign(td) * Math.atan(0.023101 * td) - 4.686035;
+  }
+
+  const el = (id) => document.getElementById(id);
+  const $ = {
+    t850: el('t850'), h850: el('h850'), gamma: el('gamma'), site: el('site'),
+    t500: el('t500'), thunder: el('thunder'),
+    tsfc: el('tsfc'), tdsfc: el('tdsfc'),
+    wbz: el('wbz'), wbzoff: el('wbzoff'),
+    k_z0: el('k_z0'), k_snow: el('k_snow'), k_cat: el('k_cat'), k_site_sub: el('k_site_sub'), k_method: el('k_method'),
+    pctBar: el('pctBar'), pctLabel: el('pctLabel'),
+    chip_intensity: el('chip_intensity'), chip_offset: el('chip_offset'), chip_thunder: el('chip_thunder'), chip_wb: el('chip_wb'),
+    assumeNote: el('assumeNote'),
+    b_mj: el('b_mj'), b_hr: el('b_hr'), b_jl: el('b_jl'), b_sf: el('b_sf'), b_hm: el('b_hm'),
+  };
+
+  function inferIntensity(t500){
+    if (!isFinite(t500)) return { label:'Moderate (assumed)', offset_m:180, code:'moderate' };
+    if (t500 > -24) return { label:'Light', offset_m:120, code:'light' };
+    if (t500 > -27.5) return { label:'Moderate', offset_m:180, code:'moderate' };
+    if (t500 > -30.5) return { label:'Heavy', offset_m:240, code:'heavy' };
+    return { label:'Heavy (very cold core)', offset_m:240, code:'heavy' };
+  }
+
+  function wetBulbBonus(ts, td){
+    if (ts === '' || td === '') return { adj:0, used:false, twb:NaN };
+    const T = Number(ts), D = Number(td);
+    if (!isFinite(T) || !isFinite(D)) return { adj:0, used:false, twb:NaN };
+    if (!(T <= 6 && (T - D) <= 5)) return { adj:0, used:false, twb:wetBulbApprox(T,D) };
+    const twb = wetBulbApprox(T, D);
+    let adj = 0;
+    if (isFinite(twb)){
+      if (twb <= 2){ adj += (2 - Math.max(twb, 0)) * 25; }
+      if (twb <= 0){ adj += Math.min(2, (0 - twb)) * 15; }
+    }
+    adj = -Math.min(80, Math.max(0, adj));
+    return { adj, used:true, twb };
+  }
+
+  function probSnow(site, snowLine, rainCode){
+    const d = site - snowLine, scale = 100;
+    let p = 1 / (1 + Math.exp(-(d) / scale));
+    const nudges = { light:-0.03, moderate:0, heavy:+0.04 };
+    p = Math.max(0, Math.min(1, p + (nudges[rainCode] || 0)));
+    return p;
+  }
+  function categoryFromProb(p){ return p>=0.7 ? 'Snow' : (p>=0.35 ? 'Mixed' : 'Rain'); }
+
+  function compute(){
+    const t850 = Number($.t850.value);
+    const h850 = Math.max(500, Math.min(3000, Number($.h850.value)));
+    const gamma = Math.max(0.1, Math.min(12, Number($.gamma.value)));
+    const site = Number($.site.value) || 0;
+    const t500Val = $.t500.value === '' ? NaN : Number($.t500.value);
+    const thunderOn = $.thunder.checked;
+    const wbzVal = $.wbz.value === '' ? NaN : Number($.wbz.value);
+    const wbzOff = Number($.wbzoff.value) || 200;
+
+    // Base freezing level from 850
+    const z0 = h850 + (t850 / gamma) * 1000;
+    $.k_z0.textContent = clampRound(z0, -500, 4000) + ' m';
+
+    // Intensity inference
+    const inf = inferIntensity(t500Val);
+    $.chip_intensity.textContent = inf.label;
+    $.chip_offset.textContent = '−' + inf.offset_m + ' m';
+    $.assumeNote.style.display = isFinite(t500Val) ? 'none' : 'block';
+
+    // Thunder bonus (positive distance below FL)
+    const thunder_m = thunderOn ? 80 : 0;
+    $.chip_thunder.textContent = thunderOn ? '−80 m' : '—';
+
+    // Optional wet-bulb (negative adj lowers further)
+    const wb = wetBulbBonus($.tsfc.value, $.tdsfc.value);
+    $.chip_wb.textContent = wb.used ? ((wb.adj||0).toFixed(0) + ' m' + (isFinite(wb.twb) ? ` (Tᵂ≈${round1(wb.twb).toFixed(1)}°C)` : '')) : '—';
+
+    // Method: WBZ override or 850-based
+    let snowLevel, method = '850‑based';
+    if (isFinite(wbzVal) && wbzVal > 0){
+      const tweak = inf.code === 'light' ? -20 : (inf.code === 'heavy' ? +20 : 0);
+      const off = Math.max(120, Math.min(300, wbzOff + tweak));
+      snowLevel = wbzVal - off - thunder_m + (wb.used ? wb.adj : 0);
+      method = 'WBZ‑based';
+    } else {
+      // *** Corrected formula: FL − (offset + thunder) + wetbulb ***
+      snowLevel = z0 - (inf.offset_m + thunder_m) + (wb.used ? wb.adj : 0);
+    }
+
+    const snowOut = clampRound(snowLevel, -200, 4000);
+    $.k_snow.textContent = snowOut + ' m';
+    $.k_method.textContent = 'Method: ' + method;
+    $.k_site_sub.textContent = 'Site: ' + site + ' m';
+
+    const p = probSnow(site, snowOut, inf.code);
+    const pct = Math.round(p * 100);
+    $.pctLabel.innerHTML = '<b>' + pct + '%</b>';
+    $.pctBar.style.width = Math.max(2, pct) + '%';
+    $.k_cat.textContent = categoryFromProb(p);
+
+    const mark = (h) => (h >= snowOut ? '❄️' : '🌧️');
+    $.b_mj.textContent = mark(1300);
+    $.b_hr.textContent = mark(850);
+    $.b_jl.textContent = mark(800);
+    $.b_sf.textContent = mark(900);
+    $.b_hm.textContent = mark(2000);
+  }
+
+  ['t850','h850','gamma','site','t500','thunder','wbz','wbzoff','tsfc','tdsfc'].forEach(id => {
+    const node = document.getElementById(id);
+    if (node){ node.addEventListener('input', compute); node.addEventListener('change', compute); }
+  });
+  document.querySelectorAll('[data-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const map = {
+        israel:{ t850:-4, h850:1500, gamma:5.5, site:850, t500:-28 },
+        wet:   { t850:-2, h850:1500, gamma:5.5, site:600, t500:-26 },
+        dry:   { t850:-6, h850:1450, gamma:7.3, site:900, t500:-27 },
+        deep:  { t850:-5, h850:1500, gamma:5.6, site:700, t500:-31 },
+      };
+      const p = map[btn.dataset.preset];
+      if (!p) return;
+      Object.entries(p).forEach(([k,v]) => { const n = document.getElementById(k); if (n) n.value = v; });
+      compute();
+    });
+  });
+
+  compute();
+</script>
+</body>
+</html>
